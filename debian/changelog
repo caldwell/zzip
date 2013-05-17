@@ -1,0 +1,66 @@
+zzip (2.4) unstable; urgency=low
+
+  * Added new "Unencrypted CRC" header.
+  * Added some more command line argument error checking.
+
+ -- David Caldwell <david@indigita.com>  Wed, 26 Nov 2003 16:45:31 -0800
+
+zzip (2.3) unstable; urgency=low
+
+  * Actually use -L instead of -l for large files like I planned to.
+  * Fixed a typo in the Destination Path that kept uploading from working.
+  * Stopped checksuming random garbage in the padding.
+  * Allowed the use of stdin and stdout.
+  * Added ZZIP_KEY environment variable support.
+
+ -- Jim Radford <radford@indigita.com>  Mon,  8 Sep 2003 17:13:15 -0700
+
+zzip (2.2) unstable; urgency=low
+
+  * Fixed incompatibility with Gem ROM Loader.
+  * Added zupport for really big files. (radford)
+  * Added good command line switches for common zzip usages. (radford)
+  * Added unzip support for non-compressed files.
+  * Added CRC32s for both plaintext and encrypted+compressed data.
+  * Added new -o option to set output filename.
+
+ -- David Caldwell <david@indigita.com>  Wed, 23 Jul 2003 21:30:32 -0700
+
+zzip (2.1) unstable; urgency=low
+
+  * Added zunzip.
+  * "Plaintext Checksum" is now calculated before compressing the file.
+
+ -- David Caldwell <david@indigita.com>  Fri, 18 Jul 2003 19:34:49 -0700
+
+zzip (2.0) unstable; urgency=low
+
+  * Changed blowfish algorithm back to standard blowfish. This is an
+    incompatible change, so the major version got bumped.
+
+ -- David Caldwell <david@indigita.com>  Wed,  9 Apr 2003 15:43:37 -0700
+
+zzip (1.2) unstable; urgency=low
+
+  * Added support for new Key file format (version 2). The old format is
+    still supported.
+
+ -- David Caldwell <david@indigita.com>  Wed, 18 Sep 2002 13:41:23 -0700
+
+zzip (1.1) unstable; urgency=low
+
+  * If we are encrypting, we now align the length of the data to an 8 byte
+    boundary. This happens after compressing, as compressing changes the
+    length (duh.). This fixes the problem where the loader would get
+    decompression errors on most files that were both compressed and
+    encrypted. Some files would be aligned after compression and so they
+    would work, and that really threw me off.
+
+ -- David Caldwell <david@indigita.com>  Wed, 17 Apr 2002 20:01:46 -0700
+
+zzip (1.0-1) unstable; urgency=low
+
+  * Initial Release.
+
+ -- David Caldwell <david@indigita.com>  Fri, 29 Mar 2002 16:44:52 -0800
+

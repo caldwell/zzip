@@ -1,0 +1,14 @@
+Source: zzip
+Section: devel
+Priority: optional
+Maintainer: David Caldwell <david@indigita.com>
+Build-Depends: debhelper (>> 3.0.0)
+Standards-Version: 3.5.2
+
+Package: zzip
+Architecture: any
+Depends: ${shlibs:Depends}
+Description: Compress files, add arbitrary meta-data.
+ zzip compresses/excrypts files and lets the user add arbitrary
+ meta-data in the form of text headers at the top of the file. It is
+ perfect for binary ROM firmware files.

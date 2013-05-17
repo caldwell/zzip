@@ -1,0 +1,34 @@
+Summary: zzip
+Name: zzip
+%define version 0.4
+Version: %{version}
+Release: 0
+Copyright: Inditga Corporation
+Group: utility/test
+Source: zzip-%{version}.tar.gz
+Packager: Jim Radford <radford@indigita.com>
+Prefix: /usr
+BuildRoot: /.
+
+%description 
+zzip is Indigita's cross-platform versioning firmware compression utilities.
+
+%prep
+%setup
+
+%build
+./configure --prefix=/usr
+make
+
+%install
+rm -rf ${RPM_BUILD_ROOT}
+make install prefix=${RPM_BUILD_ROOT}/usr
+
+%post 
+
+%clean
+rm -rf ${RPM_BUILD_ROOT}
+
+%files
+/usr/bin/zzip
+/usr/bin/zinfo
