@@ -1,5 +1,5 @@
-#!/bin/sh
-aclocal
-automake --add-missing
+#!/bin/sh -xe
+aclocal-1.7 || aclocal-1.6 || aclocal
+automake-1.7 --add-missing || automake-1.6 --add-missing || automake --add-missing
 autoconf
 ./configure "$@"

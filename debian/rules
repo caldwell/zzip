@@ -23,11 +23,9 @@ endif
 configure: configure-stamp
 configure-stamp:
 	dh_testdir
-	aclocal
-	autoconf
-	automake || true;
+	#./setup
 	# Add here commands to configure the package.
-	./configure --host=$(DEB_HOST_GNU_TYPE) --build=$(DEB_BUILD_GNU_TYPE) --prefix=/usr --mandir=\$${prefix}/share/man --infodir=\$${prefix}/share/info
+	./setup --host=$(DEB_HOST_GNU_TYPE) --build=$(DEB_BUILD_GNU_TYPE) --prefix=/usr --mandir=\$${prefix}/share/man --infodir=\$${prefix}/share/info
 
 	touch configure-stamp
 
@@ -37,7 +35,7 @@ build-stamp: configure-stamp
 	dh_testdir
 
 	# Add here commands to compile the package.
-	$(MAKE) zheader.c blowfish.c all
+	$(MAKE)
 	#/usr/bin/docbook-to-man debian/zzip.sgml > zzip.1
 
 	touch build-stamp
@@ -66,6 +64,7 @@ install: build
 
 	# Add here commands to install the package into debian/zzip.
 	$(MAKE) install prefix=$(CURDIR)/debian/zzip/usr
+	cp good-key $(CURDIR)/debian/zzip/usr/bin
 
 
 # Build architecture-independent files here.

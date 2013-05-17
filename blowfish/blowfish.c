@@ -332,12 +332,34 @@ void Blowfish_Encrypt(BlowfishContext *ctx, unsigned long *xl, unsigned long *xr
   *xr = Xr;
 }
 
+#define Reverse32(x) (((x) >> 24 & 0x000000ff) |    \
+                      ((x) >>  8 & 0x0000ff00) |    \
+                      ((x) <<  8 & 0x00ff0000) |    \
+                      ((x) << 24 & 0xff000000))
+#ifdef __APPLE__
+# include <machine/endian.h>
+#else
+# include <endian.h>
+#endif
+
 void Blowfish_Encrypt_Buffer(BlowfishContext *ctx, unsigned long *buffer, unsigned long length)
 {
     unsigned long *buf = (unsigned long *)buffer;
     unsigned int i;
+#if BYTE_ORDER == BIG_ENDIAN
+    // Oops. We screwed up. Blowfish is supposed to be big-endian but
+    // we've been doing it little endian. On a big endian host we need
+    // to byte swap the data. It really should be the opposite, but we
+    // need to be backwards compatible now!
+    for (i=0;i<length; i+=8, buf+=2) {
+        *buf = Reverse32(*buf); *(buf+1) = Reverse32(*(buf+1));
+        Blowfish_Encrypt(ctx, buf, buf+1);
+        *buf = Reverse32(*buf); *(buf+1) = Reverse32(*(buf+1));
+    }
+#else
     for (i=0;i<length; i+=8, buf+=2)
         Blowfish_Encrypt(ctx, buf, buf+1);
+#endif
 }
 #endif
 
@@ -378,8 +400,20 @@ void Blowfish_Decrypt_Buffer(BlowfishContext *ctx, unsigned long *buffer, unsign
 {
     unsigned long *buf = (unsigned long *)buffer;
     unsigned int i;
+#if BYTE_ORDER == BIG_ENDIAN
+    // Oops. We screwed up. Blowfish is supposed to be big-endian but
+    // we've been doing it little endian. On a big endian host we need
+    // to byte swap the data. It really should be the opposite, but we
+    // need to be backwards compatible now!
+    for (i=0;i<length; i+=8, buf+=2) {
+        *buf = Reverse32(*buf); *(buf+1) = Reverse32(*(buf+1));
+        Blowfish_Decrypt(ctx, buf, buf+1);
+        *buf = Reverse32(*buf); *(buf+1) = Reverse32(*(buf+1));
+    }
+#else
     for (i=0;i<length; i+=8, buf+=2)
         Blowfish_Decrypt(ctx, buf, buf+1);
+#endif
 }
 #endif
 

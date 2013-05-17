@@ -10,7 +10,11 @@ dnl Checks for libraries.
 dnl Checks for header files.
 AC_STDC_HEADERS
 AC_HAVE_HEADERS(zlib.h string.h sys/stat.h)
-     
+AC_CHECK_HEADER([error.h], [AM_CONDITIONAL(NEED_ERROR_H, false)],
+                [AM_CONDITIONAL(NEED_ERROR_H, true)])
+AC_CHECK_HEADER([bzlib.h], [AM_CONDITIONAL(HAVE_BZLIB2, true)],
+                [AM_CONDITIONAL(HAVE_BZLIB2, false)])
+
 dnl Checks for library functions.
 AC_FUNC_ALLOCA
      

@@ -1,4 +1,4 @@
-/* $Header: /cvs/host/zzip/zzip.c,v 1.24 2003/11/27 00:37:23 david Exp $
+/* $Header: /cvs/host/zzip/zzip.c,v 1.32 2005/03/07 21:36:33 david Exp $
 -------=====================<<<< COPYRIGHT >>>>========================-------
          Copyright (c) 2001 Indigita Corp,  All Rights Reserved.
  See full text of copyright notice and limitations of use in file COPYRIGHT.h
@@ -8,11 +8,14 @@
 
 #undef LZOLibNotZlib
 #ifdef LZOLibNotZlib
-#include <lzo1x.h>
-#define Extension ".lzo"
+# include <lzo1x.h>
+# define Extension ".lzo"
 #else
-#include <zlib.h>
-#define Extension ".z"
+# include <zlib.h>
+# ifdef BZIP2
+#  include <bzlib.h>
+# endif
+# define Extension ".z"
 #endif
 #include <string.h>
 #include <unistd.h>
@@ -25,22 +28,31 @@
 #include <sys/mman.h>
 #include <stdint.h>
 #include <ctype.h>
-#include <error.h>
+#include "error.h"
 #include <errno.h>
 
 #include "zheader.h"
 
-#define version "2.4"
+#define version "3.0"
 
-char *ParseKeyFile(char *file, int index);
+char *ParseKeyFile(char *file, char *index);
 void UnzipIt(char *zfile, BlowfishContext *blowfish, char *output);
 
 void Usage(char *me)
 {
-    fprintf(stderr,"usage: %s [-p | -f | (-F [-L|-S|-M] -d<destination file>)] [-E<key-file] [-e<key>] [-v] [-D] [-Z] [-h<extra-header>] [-o<output file>] <binary-image>\n",me);
+    fprintf(stderr,"usage: %s [-p | -f | (-F [-L|-S|-M] -d<destination file>)] [-E<key-file] [-e<key>] [-v] [-D] [-Z%s] [-h<extra-header>] [-o<output file>] <binary-image>\n",me,
+#ifdef BZIP2
+            "|-b"
+#else
+            ""
+#endif
+            );
     fprintf(stderr,"       %s  [-E<key-file] [-e<key>] [-v] [-s] -u [-o<output file>] <zzip-file>\n",me);
     fprintf(stderr,"      -s Use stupid short DOS filenames.\n"
                    "      -Z Dont compress.\n"
+#ifdef BZIP2
+                   "      -b Use bzip2 compression library instead of zlib.\n"
+#endif
                    "      -v Show Version number\n"
                    "      -h<extra-header> Adds <extra-header> to the zzip header. This must be\n"
                    "                       a complete header, eg. \"key = value\".\n"
@@ -50,6 +62,7 @@ void Usage(char *me)
                    "\n"
                    "      -p preferences\n"
                    "      -f firmware\n"
+                   "      -l loader\n"
                    "      -F file upload\n"
                    "         -L large file\n"
                    "         -S small file\n"
@@ -57,19 +70,25 @@ void Usage(char *me)
                    "      -d<destination> This is the filename used when the file is uploaded.\n"
                    "      -o<output file> The output is written to this file instead of the default.\n"
                    "                      Use '-' for stdout.\n"
-                   "      <zzip-file>     The file to un-zzip.  stdin is used if not specified.\n"
-                   "      <binary-image>  The file to zzip.     stdin is used if not specified.\n"
+                   "      <binary-image>  The file to zzip.     Use - for stdin.\n"
+                   "      <zzip-file>     The file to un-zzip.\n"
             );
     fprintf(stderr,"\nThis program converts a file to a compressed/encrypted file with\n"
                    "extensible, easily parsed meta-data\n\n"
                    "There are 2 keyfile formats. Version 1:\n"
                    "  The key file is just a list of keys. Keys can be any length.\n"
                    "  Each key is separated by a single null.\n"
+                   "  Keys are specified (with -e) by the numeric index of the key based on the\n"
+                   "  order of the file.\n"
                    "Version 2:\n"
                    "  The first line must be exactly \"Version 2 Keyfile:\"\n"
                    "  Each line after that should be \"xx yyyyyyyyyy\" where 'xx' is the index and\n"
-                   "  'yyyyy' is the key. The index starts at zero and increments by one for each key.\n"
-                   "  The index should be zero padded for indices < 10.\n"
+                   "  'yyyyy' is the key. The index can be any string that doesn't contain a space\n"
+                   "  character.  The key, however, *can* contain spaces. The key is terminated by\n"
+                   "  an end of line character.  As a special case, if the key passed by the -e flag\n"
+                   "  is numeric then the index string will be compared as if it were a number.\n"
+                   "  The maintains backwards compatibility with older version 2 key files (the\n"
+                   "  keys used to be exclusively numeric).\n"
             );
     exit(1);
 }
@@ -91,7 +110,8 @@ int main(int c,char **v)
     struct stat s;
     int StupidDosCantHandleLongFileNames = 0;
     int dontCompress = 0;
-    int encryptIndex = -1;
+    int bzip2 = 0;
+    char *encryptIndex = 0;
     int encryption = 0;
     char *encryptFile = NULL;
     int plaintextChecksum;
@@ -108,6 +128,10 @@ int main(int c,char **v)
                 StupidDosCantHandleLongFileNames = 1;
             else if (v[c][1] == 'Z') /* and of course, dont compress */
                 dontCompress = 1;
+#ifdef BZIP2
+            else if (v[c][1] == 'b') /* use bzip2 */
+                bzip2 = 1;
+#endif
             else if (v[c][1] == 'v') { /* give version info */
                 printf("%s version %s\n", v[0],version);
                 exit(0);
@@ -115,7 +139,7 @@ int main(int c,char **v)
             else if (v[c][1] == 'e') {/* encrypt! */
                 encryption = 1;
                 if (v[c][2])
-                    encryptIndex = strtoul(&v[c][2],NULL,0);
+                    encryptIndex = &v[c][2];
             } else if (v[c][1] == 'E') /* encryption file */
                 encryptFile = &v[c][2];
             else if (v[c][1] == 'u') /* unzip */
@@ -124,6 +148,8 @@ int main(int c,char **v)
                 type = "Gem Preferences";
             else if (v[c][1] == 'f')
                 type = "Firmware";
+            else if (v[c][1] == 'l')
+                type = "Gem Loader";
             else if (v[c][1] == 'F')
                 type = "File";
             else if (v[c][1] == 'L')
@@ -136,8 +162,13 @@ int main(int c,char **v)
                 destination = &v[c][2];
             else if (v[c][1] == 'o')
                 output = &v[c][2];
+            else if (v[c][1] == '\0')
+                filename = "-";
             else if (v[c][1] == '-')
-                break;
+                if (v[c][2] == '\0')
+                    break;
+                else
+                    Usage(v[0]);
             else {
                 fprintf(stderr,"'%c' is an invalid option\n",v[c][1]);
                 Usage(v[0]);
@@ -155,10 +186,12 @@ int main(int c,char **v)
     if (encryption) {
         char *key = getenv("ZZIP_KEY");
         if (key) {
-            encryptIndex = strtoul(key, NULL, 10);
-            key += 3;
+            key = strdup(key);
+            encryptIndex = strsep(&key, " ");
+            if (!encryptIndex || !key)
+                error(EXIT_FAILURE, 0, "Bad ZZIP_KEY environment variable format. Want \"<key_name> <key>\" not \"%s\".", getenv("ZZIP_KEY"));
             Blowfish_Init(&context,key,strlen(key));
-        } else if (encryptIndex >= 0) {
+        } else if (encryptIndex) {
             if (!encryptFile)
                 error(EXIT_FAILURE, 0, "Looks like you forgot the -E command line option.");
             key = ParseKeyFile(encryptFile, encryptIndex);
@@ -172,8 +205,13 @@ int main(int c,char **v)
 
     if (encryptFile && !encryption)
         error(EXIT_FAILURE, 0, "option -E also requires option -e.");
-    
+
     if (!filename) {
+        fprintf(stderr,"You must specify a file.\n");
+        Usage(v[0]);
+    }
+
+    if (strcmp(filename,"-")==0) {
         r = 0;
     } else
         r = open(filename, O_RDONLY
@@ -215,7 +253,7 @@ int main(int c,char **v)
         zlen = s.st_size;
         zrom = rom;
     } else {
-        zrom  = calloc(1,zlen = s.st_size * 101 / 100 + 8); /* read zlib.h */
+        zrom  = calloc(1,zlen = s.st_size * 101 / 100 + (bzip2 ? 600 : 8)); /* read zlib.h and bzip2 docs section 3.5.1 */
         if(zrom ==0)
             error(EXIT_FAILURE, 0, "%s: No memory for zrom length %d",v[0], zlen);
 #ifdef LZOLibNotZlib
@@ -225,6 +263,14 @@ int main(int c,char **v)
         if((e=lzo1x_999_compress(rom,s.st_size,zrom,&zlen,workmem)) != LZO_E_OK)
             error(EXIT_FAILURE, 0, "%s: compress error %d",v[0],e);
 #else
+#ifdef BZIP2
+        if (bzip2) {
+            unsigned int l=zlen;
+            if ((e=BZ2_bzBuffToBuffCompress(zrom,&l,rom,s.st_size, 6, 0/*verbose*/, 0/*work-factor(default)*/)) != BZ_OK)
+                error(EXIT_FAILURE, 0, "%s: compress error %d",v[0],e);
+            zlen=l;
+        } else
+#endif
         if((e=compress(zrom,&zlen,rom,s.st_size)) != Z_OK)
             error(EXIT_FAILURE, 0, "%s: compress error %d",v[0],e);
 #endif
@@ -243,10 +289,10 @@ int main(int c,char **v)
         Blowfish_Encrypt_Buffer(&context, (unsigned long*)zrom, zlen);
     }
     
-    if (output && strcmp(output, "-"))
+    if (output && strcmp(output, "-")!=0)
         zfile = output;
     
-    if (!output && filename) {
+    if (!output && filename && strcmp(filename,"-")!=0) {
         char *c;
         zfile = malloc(strlen(filename)+3);
         strcpy(zfile,filename);
@@ -260,11 +306,12 @@ int main(int c,char **v)
             error(EXIT_FAILURE, 0, "%s: can't open %s",v[0],zfile);
     } else
         f = stdout;
-    
+
+    uint64_t orig_size = s.st_size;
     /* do header */
     fprintf(f,"zzip version 1.0 (%s)\n",version);
     fprintf(f,"Compressed Length   = 0x%08lX\n",zlen); // should really be called "encrypted length" (only on encryption) because it's rounded up.
-    fprintf(f,"Uncompressed Length = 0x%08lX\n",s.st_size);
+    fprintf(f,"Uncompressed Length = 0x%08llX\n",orig_size);
     fprintf(f,"Checksum            = 0x%08lX\n",Checksum(zrom,zlen));
     fprintf(f,"CRC                 = 0x%08lX\n",crc32(0, zrom, zlen));
     if (dontCompress)
@@ -274,7 +321,7 @@ int main(int c,char **v)
 #ifdef LZOLibNotZlib
                 "lzo"
 #else
-                "zlib"
+                bzip2 ? "bzip2" : "zlib"
 #endif
                 );
     if (type)
@@ -287,7 +334,7 @@ int main(int c,char **v)
         fprintf(f,"Unencrypted Length  = 0x%08lX\n",zlen_orig); // Should really be called "compressed length" because it's not rounded
         fprintf(f,"Unencrypted CRC     = 0x%08lX\n",unencryptedCRC); // Should really be called "compressed CRC" because it's not rounded
         fprintf(f,"Encryption          = blowfish\n");
-        fprintf(f,"Encryption Key      = %d\n",encryptIndex);
+        fprintf(f,"Encryption Key      = %s\n",encryptIndex);
         fprintf(f,"Plaintext Checksum  = 0x%08lX\n",plaintextChecksum); // "Unencrypted Checksum" (may still be compressed)
         fprintf(f,"Plaintext CRC       = 0x%08lX\n",plaintextCRC);
     }
@@ -307,7 +354,7 @@ int main(int c,char **v)
     exit (0);
 }
 
-char *ParseKeyFile(char *file, int index)
+char *ParseKeyFile(char *file, char *index)
 {
     struct stat s;
     FILE *f = fopen(file,"r");
@@ -336,34 +383,47 @@ char *ParseKeyFile(char *file, int index)
         goto error;
     }
 
+    int indexNum=-1;
+    for (i=0; index[i]; i++)
+        if (!isdigit(index[i]))
+            goto string_index;
+    indexNum = strtol(index, NULL, 10);
+  string_index:
+    
     if (strncmp(buf, "Version 2 Keyfile", sizeof("Version 2 Keyfile")-1) == 0) {
         char *b;
         int keyNum;
         // Version 2 Key format:
         i=0;
-        b = strtok(buf, "\n"); // start it off and skip the first line (the version part).
-        while (b = strtok(NULL, "\n\r")) {
+        char *rest = buf;
+        strsep(&rest, "\n"); // skip the first line (the version part).
+        while (b = strsep(&rest, "\n\r")) {
             // The line should be formatted like this: "01) Key text blah blah blah"
-            if (sscanf(b,"%d)", &keyNum) == 1) {
-                i++;
-                if (keyNum == index) {
-                    while (isdigit(*b))
-                        b++;
-                    while (*b == ')')
-                        b++;
-                    while (isspace(*b))
-                        b++;
-                    key = strdup(b);
-//                    fprintf(stderr,"The key selected was \"%s\"\n", key);
-                    goto gotkey;
-                }
-            }
+            // The line should be formatted like this: "lalalala Key text blah blah blah"
+            char *r = b, *keyIndex = strsep(&r, " ");
+            
+            if (!keyIndex || !r) continue; // blank line? Bad line?
+            i++;
+
+            if (indexNum != -1 && strtoul(keyIndex, NULL, 10) != indexNum ||
+                indexNum == -1 && strcasecmp(keyIndex, index) != 0)
+                continue;
+
+            while (isspace(*r))
+                r++;
+            key = strdup(r);
+            //fprintf(stderr,"The key selected was \"%s\"\n", key);
+            goto gotkey;
         }
         i--; // Hack. :-)
     } else {
+        if (indexNum == -1) {
+            fprintf(stderr,"Version 1 keyfile's can't have non-numeric key indices! (\"%s\" is not allowed)\n", index);
+            goto error;
+        }
         // Version 1 Key format:
         for (j=0,i=0;j<s.st_size;j++) {
-            if (i == index) {
+            if (i == indexNum) {
                 // This is the key we're looking for.
                 // so find where it ends.
                 for (k=j;k<s.st_size;k++) {
@@ -387,7 +447,7 @@ char *ParseKeyFile(char *file, int index)
         }
     }
     
-    fprintf(stderr,"There is no key %d in \"%s\". There is only 0 through %d!\n",
+    fprintf(stderr,"There is no key %s in \"%s\". There is only 0 through %d!\n",
             index, file, i);
 
   gotkey:
@@ -442,13 +502,13 @@ char *GetZHeaderPayload(char *header, char **dataOut, size_t *lengthOut, unsigne
     int isEncrypted = strcmp(encryption, "blowfish") == 0;
 
     unsigned long realLength = length;
+    if (!GetHeaderNumber(header, "Uncompressed Length", &realLength))
+        return "eNoUncompressedLength";
+
     if (isEncrypted) {
         if (!blowfish)
             return "eImageIsEncrypted";
         
-        if (!GetHeaderNumber(header, "Uncompressed Length", &realLength))
-            return "eNoUncompressedLength";
-
         DecryptInChunks(data, length, blowfish);
         memset(blowfish, 0, sizeof(*blowfish));
     }
@@ -477,6 +537,13 @@ void UnzipIt(char *zfile, BlowfishContext *blowfish, char *output)
         int err;
         if ((err = uncompress(uncompressed, &uncompressedLength, data, length)) != Z_OK)
             error(EXIT_FAILURE, 0, "Uncompression error %d", err);
+#ifdef BZIP2
+    } else if (strcmp(compression, "bzip2") == 0) {
+        int err; unsigned int l=uncompressedLength;
+        if ((err = BZ2_bzBuffToBuffDecompress(uncompressed, &l, data, length, 0/*small*/, 0/*verbose*/)) != BZ_OK)
+            error(EXIT_FAILURE, 0, "Uncompression error %d", err);
+        uncompressedLength = l;
+#endif
     } else if (strcmp(compression, "none") == 0) {
         memcpy(uncompressed, data, uncompressedLength);
     } else
@@ -514,6 +581,43 @@ void UnzipIt(char *zfile, BlowfishContext *blowfish, char *output)
 
 /*
  * $Log: zzip.c,v $
+ * Revision 1.32  2005/03/07 21:36:33  david
+ * - Relasing 3.0! (Version number bump as key files got changed again
+ *   (though they are backwards compatible).
+ *
+ * Revision 1.31  2005/02/17 06:01:39  david
+ * - Updated keyfile format. It is backwards compatible with the old
+ *   version 2 format. The difference is that the indices need not be
+ *   numeric or short. The only restriction is that they can't have
+ *   spaces (because space is the separator). This lets you have things
+ *   in your key file like ".Vendor-Key.Indigita.5C Some Cool Key". You
+ *   specify this on the command line as "-e.Vendor-Key.Indigita.5C" and
+ *   it will encrypt with the key "Some Cool Key" (Re: #954)
+ *
+ * Revision 1.30  2005/02/17 04:16:09  david
+ * - Added support for bzip2 compression library.
+ *
+ * Revision 1.29  2004/09/21 21:45:43  david
+ * - Fixed bug where compressed-but-not-encrypted images couldn't be
+ *   unzipped.
+ *
+ * Revision 1.28  2004/05/29 00:25:49  david
+ * - Fix problem where mac st_size is a uint64_t.
+ * - Tweak version number for mac-only release.
+ *
+ * Revision 1.27  2004/05/12 20:48:22  radford
+ * o Support -l as a helper for zziping Loaders
+ *
+ * Revision 1.26  2004/05/12 20:45:18  radford
+ * o Require explicit -'s for stdin and stdout, except stdout is
+ *   assumed when input is stdin.
+ * o --* options are explicitly disallowed, thereby implementing
+ *   --help without really supporting -- options (though we do
+ *   still support the -- option :))
+ *
+ * Revision 1.25  2003/12/24 21:50:39  david
+ * - Support for computers without error.h
+ *
  * Revision 1.24  2003/11/27 00:37:23  david
  * - Added unencrypted CRC which is calculated between compression and
  *   encryption. This lets the Gem ROM Loader check the output of

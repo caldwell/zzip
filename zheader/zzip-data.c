@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <time.h>
 #include "zzip-data.h"
-#include "zlib.h"
+#include "crc32.h"
 #include "zheader/zheader.h"
 #include "blowfish/blowfish.h"
 
@@ -20,7 +20,7 @@ char *ZzipData(char *image_type, char *data, size_t *length, char **extra_header
     if (key) {
         key_index = strtoul(key, NULL, 10);
         key += 3;
-        plaintextCRC = crc32(0, (Bytef*)data, *length);
+        plaintextCRC = CRC32(0, data, *length);
         // Blowfish (at least our implementation) requires the input to be on an 8 byte
         // boundary. Otherwise when we decrypt we will get garbled data on the last little bit.
         if (rounded_length % 8 != 0)
@@ -38,7 +38,7 @@ char *ZzipData(char *image_type, char *data, size_t *length, char **extra_header
     o += sprintf(buffer+o,"Compressed Length   = 0x%08X\n",rounded_length); // should really be called "encrypted length" (only on encryption) because it's rounded up.
     o += sprintf(buffer+o,"Uncompressed Length = 0x%08X\n",*length);
     o += sprintf(buffer+o,"Checksum            = 0x%08lX\n",Checksum((uint8_t*)data,rounded_length));
-    o += sprintf(buffer+o,"CRC                 = 0x%08lX\n",crc32(0, (uint8_t*)data, rounded_length));
+    o += sprintf(buffer+o,"CRC                 = 0x%08lX\n",(unsigned long)CRC32(0, (uint8_t*)data, rounded_length));
     o += sprintf(buffer+o,"Compression         = none\n");
     o += sprintf(buffer+o,"Image Type          = %s\n", image_type);
     if (key) {
@@ -50,7 +50,6 @@ char *ZzipData(char *image_type, char *data, size_t *length, char **extra_header
     }
     while(extra_headers && *extra_headers)
         o += sprintf(buffer+o, "%s\n", *extra_headers++);
-    o += sprintf(buffer+o,"Name                = <on-the-fly>\n");
     time_t t = time(&t);
     o += sprintf(buffer+o,"Date                = %s",ctime(&t));
     memcpy(buffer+o+1, data, rounded_length);

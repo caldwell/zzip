@@ -1,4 +1,4 @@
-/* $Header: /cvs/host/zzip/zheader/zheader.h,v 1.12 2003/10/13 23:28:02 radford Exp $
+/* $Header: /cvs/host/zzip/zheader/zheader.h,v 1.14 2004/08/27 02:42:12 david Exp $
 -------=====================<<<< COPYRIGHT >>>>========================-------
          Copyright (c) 1995-1998 Indigita Corp,  All Rights Reserved.
  See full text of copyright notice and limitations of use in file COPYRIGHT.h
@@ -6,11 +6,16 @@
 */
 #include "COPYRIGHT.h"
 
-/**@file zheader.h
+/**@file
  *
  * @brief This file contains functions that can parse the header of
  * Indigita's zzip format files.
  *
+ * @see zheader
+ */
+
+/**@defgroup zheader The zzip file format
+ * @{
  * The zzip format is a simple format designed to go with various
  * small configuration files or ROM images. It consists of a null
  * terminated string prepended to the actual file data (called the
@@ -90,6 +95,8 @@
  * Load Address = 0xc0000000
  * Start Address = 0xc0000100
  * </pre>
+ * @see zheader.h
+ * @}
  */
 #ifndef ZHEADER_H
 #define ZHEADER_H
@@ -248,7 +255,6 @@ char * EatSpace(char *in);
 char *NextHeaderName(char *name, int *length);
 
 #if 0
-void PrintHeader(char *header);
 int NumberOfImagesInBundle(char *firstHeader, int maxLength);
 char * GetImageFromBundle(char *firstHeader, int number);
 #endif
@@ -261,6 +267,12 @@ char * GetImageFromBundle(char *firstHeader, int number);
 
 /*
  * $Log: zheader.h,v $
+ * Revision 1.14  2004/08/27 02:42:12  david
+ * - Printing the header is easy enough... No need for a function.
+ *
+ * Revision 1.13  2004/05/20 23:20:47  david
+ * - Put zheader documentation into its own section.
+ *
  * Revision 1.12  2003/10/13 23:28:02  radford
  * o Make the zheader and database interfaces clearer by using bools.
  *

@@ -1,4 +1,4 @@
-/* $Header: /cvs/host/zzip/zheader/zheader.c,v 1.16 2003/10/20 22:58:55 radford Exp $
+/* $Header: /cvs/host/zzip/zheader/zheader.c,v 1.18 2004/08/27 02:42:06 david Exp $
 -------=====================<<<< COPYRIGHT >>>>========================-------
          Copyright (c) 1995-1998 Indigita Corp,  All Rights Reserved.
  See full text of copyright notice and limitations of use in file COPYRIGHT.h
@@ -44,7 +44,6 @@ bool GetHeaderString(char *header,char *name, char *value, int length)
 	return true;
 }
 
-#ifndef ZHEADER_MINIMAL
 bool GetHeaderBoolean(char *header, char *name, bool *value)
 {
     char b[24];
@@ -60,7 +59,6 @@ bool GetHeaderBoolean(char *header, char *name, bool *value)
     
     return true;
 }
-#endif
 
 char *EatSpace(char *in)
 {
@@ -133,17 +131,6 @@ char *NextHeaderName(char *name, int *length)
     return new;
 }
 
-#if 0
-void PrintHeader(char *header)
-{
-#if defined(MSDOS) || defined(__unix__) || defined(macintosh)
-	printf("%s",header);
-#else
-	k_printf("%s",header);
-#endif
-}
-#endif
-
 unsigned long Checksum(unsigned char *c,unsigned long l)
 {
 	unsigned long sum=0;
@@ -186,6 +173,15 @@ char *GetImageFromBundle(char *firstHeader, int number)
 
 /*
  * $Log: zheader.c,v $
+ * Revision 1.18  2004/08/27 02:42:06  david
+ * - Printing the header is easy enough... No need for a function.
+ *
+ * Revision 1.17  2004/04/30 23:54:25  radford
+ * o Added a "Run Before Status" header to tell the rom-loader that it
+ *   should wait for the uploaded program to run before returning status
+ *   to the host allowing the return value of the program itself to
+ *   be returned instead of only the status of the load.
+ *
  * Revision 1.16  2003/10/20 22:58:55  radford
  * o Shrink GetHeaderBoolean by only checking the first character of the value.
  *

@@ -1,3 +1,22 @@
+zzip (3.0) unstable; urgency=low
+
+  * Added new key file format that allows arbitrary key names instead of
+    numeric indexes. This works just fine with old key files.
+  
+  * Added support for bzip2 compression.
+  
+  * Fixed bug where compressed-but-not-encrypted images couldn't be
+    unzipped.
+  
+  * zzip with no args no prints help instead of using stdin/stdout. Use
+    '-' explicitly for pipe mode.
+  
+  * --* options are explicitly disallowed, thereby implementing --help
+    without really supporting -- options (though we do still support the
+    -- option :))
+
+ -- David Caldwell <david@indigita.com>  Mon,  7 Mar 2005 13:47:04 -0800
+
 zzip (2.4) unstable; urgency=low
 
   * Added new "Unencrypted CRC" header.
