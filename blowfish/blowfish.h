@@ -6,6 +6,8 @@
 */
 #include "COPYRIGHT.h"
 
+#include <stdint.h>
+
 #ifndef __BLOWFISH_H__
 #define __BLOWFISH_H__
 
@@ -32,8 +34,8 @@ extern "C"{
  * @brief An area to hold the current encryption context.
  */
 typedef struct {
-  unsigned long P[16 + 2];
-  unsigned long S[4][256];
+  uint32_t P[16 + 2];
+  uint32_t S[4][256];
 } BlowfishContext;
 
 /**
@@ -50,7 +52,7 @@ void Blowfish_Init(BlowfishContext *context, unsigned char *key, int keyLen);
  * @param xl left input
  * @param xr right input
  */
-void Blowfish_Encrypt(BlowfishContext *context, unsigned long *xl, unsigned long *xr);
+void Blowfish_Encrypt(BlowfishContext *context, uint32_t *xl, uint32_t *xr);
 
 /**
  * @brief incrimental decryption of a unit of data
@@ -58,7 +60,7 @@ void Blowfish_Encrypt(BlowfishContext *context, unsigned long *xl, unsigned long
  * @param xl left input
  * @param xr right input
  */
-void Blowfish_Decrypt(BlowfishContext *context, unsigned long *xl, unsigned long *xr);
+void Blowfish_Decrypt(BlowfishContext *context, uint32_t *xl, uint32_t *xr);
 
 /**
  * @brief Encrypt a whole data block.
@@ -66,7 +68,7 @@ void Blowfish_Decrypt(BlowfishContext *context, unsigned long *xl, unsigned long
  * @param buffer location of data to encrypt
  * @param length how much data to encrypt
  */
-void Blowfish_Encrypt_Buffer(BlowfishContext *context, unsigned long *buffer, unsigned long length);
+void Blowfish_Encrypt_Buffer(BlowfishContext *context, uint32_t *buffer, uint32_t length);
 
  /**
  * @brief Decrypt a whole data block.
@@ -74,7 +76,7 @@ void Blowfish_Encrypt_Buffer(BlowfishContext *context, unsigned long *buffer, un
  * @param buffer location of data to decrypt
  * @param length how much data to decrypt
  */
-void Blowfish_Decrypt_Buffer(BlowfishContext *context, unsigned long *buffer, unsigned long length);
+void Blowfish_Decrypt_Buffer(BlowfishContext *context, uint32_t *buffer, uint32_t length);
 
 /**
  * @brief Verify the blowfish context.
